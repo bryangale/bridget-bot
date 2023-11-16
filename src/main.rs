@@ -1,1 +1,3 @@
+mod plottable;
+
 fn main() {}
