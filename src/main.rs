@@ -1,3 +1,4 @@
+mod circle;
 mod curve;
 mod hershey_font;
 mod plottable;
