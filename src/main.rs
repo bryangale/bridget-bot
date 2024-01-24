@@ -76,7 +76,7 @@ impl Page {
 }
 
 fn main() {
-    let plotter = RemotePlotter::new(PLOTTER_WIDTH, PLOTTER_HEIGHT);
+    let plotter = RemotePlotter::new();
 
     let page = Page::new();
 
