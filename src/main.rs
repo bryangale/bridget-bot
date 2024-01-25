@@ -1,5 +1,8 @@
+use std::str::FromStr;
+
 use circle::create_circle;
 use circle::Range;
+use clap::Parser;
 use hershey_font::HersheyFont;
 use plottable::Plottable;
 use plotter::Plotter;
@@ -30,6 +33,18 @@ pub const A4_HEIGHT_MM: f32 = 210.0;
 
 pub const GRID_CIRCLE_PROBABILITY: f32 = 0.25;
 pub const CROSS_CIRCLE_PROBABILITY: f32 = 0.25;
+
+#[derive(Parser)]
+#[command(long_about = None)]
+struct Cli {
+    /// Host where axidraw-over-http is running. Defaults to localhost.
+    #[arg(long)]
+    host: Option<String>,
+
+    /// Port to listen on. Defaults to 7878.
+    #[arg(long)]
+    port: Option<u16>,
+}
 
 struct Page {
     pub page_border: i32,
@@ -76,7 +91,11 @@ impl Page {
 }
 
 fn main() {
-    let plotter = RemotePlotter::new(PLOTTER_WIDTH, PLOTTER_HEIGHT);
+    let cli = Cli::parse();
+    let hostname = cli.host.unwrap_or(String::from_str("localhost").unwrap());
+    let port_number = cli.port.unwrap_or(7878);
+
+    let plotter = RemotePlotter::new(hostname, port_number, PLOTTER_WIDTH, PLOTTER_HEIGHT);
 
     let page = Page::new();
 

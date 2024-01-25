@@ -6,10 +6,9 @@ use std::{
     str::FromStr,
 };
 
-static URL: &str = "http://localhost:7878/batch-queue";
-
 pub struct RemotePlotter {
     client: Client,
+    url: String,
     width: i32,
     height: i32,
     x: RefCell<i32>,
@@ -18,9 +17,10 @@ pub struct RemotePlotter {
 }
 
 impl RemotePlotter {
-    pub fn new(width: i32, height: i32) -> RemotePlotter {
+    pub fn new(hostname: String, port_number: u16, width: i32, height: i32) -> RemotePlotter {
         let result = RemotePlotter {
             client: Client::new(),
+            url: format!("http://{hostname}:{port_number}/batch-queue"),
             width,
             height,
             x: RefCell::new(0),
@@ -68,7 +68,7 @@ impl RemotePlotter {
     fn flush(&self) {
         let result = self
             .client
-            .post(URL)
+            .post(self.url.clone())
             .body(self.commands.borrow_mut().join("\n"))
             .send();
 
