@@ -1,52 +1,83 @@
 use crate::{plottable::PlotPoint, plotter::Plotter};
 use reqwest::blocking::Client;
-use std::{cmp::max, str::FromStr, thread::sleep, time::Duration};
+use std::{
+    cell::RefCell,
+    cmp::{max, min},
+    str::FromStr,
+};
 
-static URL: &str = "http://localhost:7878";
+static URL: &str = "http://localhost:7878/batch-queue";
 
 pub struct RemotePlotter {
     client: Client,
+    width: i32,
+    height: i32,
+    x: RefCell<i32>,
+    y: RefCell<i32>,
+    commands: RefCell<Vec<String>>,
 }
 
 impl RemotePlotter {
-    pub fn new() -> RemotePlotter {
+    pub fn new(width: i32, height: i32) -> RemotePlotter {
         let result = RemotePlotter {
             client: Client::new(),
+            width,
+            height,
+            x: RefCell::new(0),
+            y: RefCell::new(0),
+            commands: RefCell::new(Vec::new()),
         };
-        result.push("EM,0,0");
+        result.queue("EM,1,1");
+        result.pen_up();
         result
     }
 
     fn pen_up(&self) {
-        self.push("SP,1");
-        sleep(Duration::from_millis(300));
+        self.queue("SP,1,500");
     }
 
     fn pen_down(&self) {
-        self.push("SP,0");
+        self.queue("SP,0,500");
     }
 
     fn pen_move(&self, x: i32, y: i32) {
-        let a = (x + y).abs();
-        let b = (x - y).abs();
+        let x = max(min(x, self.width), 0);
+        let y = max(min(y, self.height), 0);
 
-        let max_steps = max(a, b);
-        let duration = (max_steps as f32 * 0.5).round() as i32;
+        let dx = x - *self.x.borrow();
+        let dy = y - *self.y.borrow();
 
-        self.push(format!("XM,{},{},{}", duration, x, y).as_str());
+        if dx == 0 && dy == 0 {
+            return;
+        }
+
+        let (command, dx, dy) = get_move_command(dx, dy);
+
+        self.queue(command.as_str());
+
+        *self.x.borrow_mut() += dx;
+        *self.y.borrow_mut() += dy;
     }
 
-    fn push(&self, command: &str) {
+    fn queue(&self, command: &str) {
+        self.commands
+            .borrow_mut()
+            .push(String::from_str(command).unwrap());
+    }
+
+    fn flush(&self) {
         let result = self
             .client
             .post(URL)
-            .body(String::from_str(command).unwrap())
+            .body(self.commands.borrow_mut().join("\n"))
             .send();
 
         match result {
             Ok(_) => {}
             Err(err) => println!("{err}"),
         }
+
+        self.commands.borrow_mut().clear();
     }
 }
 
@@ -64,12 +95,35 @@ impl Plotter for RemotePlotter {
             iter.for_each(|point| self.pen_move(point.x, point.y));
             self.pen_up();
         }
+        self.flush();
     }
 }
 
 impl Drop for RemotePlotter {
     fn drop(&mut self) {
         self.pen_move(0, 0);
-        self.push("EM,0,0");
+        self.queue("EM,0,0");
+        self.flush();
     }
+}
+
+fn get_move_command(dx: i32, dy: i32) -> (String, i32, i32) {
+    let mut a = dx + dy;
+    let mut b = dx - dy;
+
+    let max_steps = max(a.abs(), b.abs());
+    let duration = (max_steps as f32 * 0.5).round() as i32;
+
+    if a != 0 && (duration / 1311) >= a.abs() {
+        a = 0;
+    }
+
+    if b != 0 && (duration / 1311) >= b.abs() {
+        b = 0;
+    }
+
+    let dx = (a + b) / 2;
+    let dy = (a - b) / 2;
+
+    (format!("SM,{},{},{}", duration, a, b), dx, dy)
 }
