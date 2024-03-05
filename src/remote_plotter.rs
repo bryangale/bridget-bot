@@ -1,51 +1,65 @@
 use crate::{plottable::PlotPoint, plotter::Plotter};
-use reqwest::blocking::Client;
 use std::{
-    cell::RefCell,
     cmp::{max, min},
     str::FromStr,
 };
+use tokio::runtime::Runtime;
+use tonic::Request;
+
+use self::axidraw_over_http::{axidraw_over_http_client::AxidrawOverHttpClient, Command};
+
+mod axidraw_over_http {
+    tonic::include_proto!("axidraw_over_http");
+}
 
 pub struct RemotePlotter {
-    client: Client,
-    url: String,
+    runtime: Runtime,
+    client: AxidrawOverHttpClient<tonic::transport::Channel>,
     width: i32,
     height: i32,
-    x: RefCell<i32>,
-    y: RefCell<i32>,
-    commands: RefCell<Vec<String>>,
+    x: i32,
+    y: i32,
+    commands: Vec<String>,
 }
 
 impl RemotePlotter {
     pub fn new(hostname: String, port_number: u16, width: i32, height: i32) -> RemotePlotter {
-        let result = RemotePlotter {
-            client: Client::new(),
-            url: format!("http://{hostname}:{port_number}/batch-queue"),
+        let runtime = Runtime::new().unwrap();
+
+        let client: AxidrawOverHttpClient<tonic::transport::Channel> = runtime
+            .block_on(AxidrawOverHttpClient::connect(format!(
+                "http://{hostname}:{port_number}"
+            )))
+            .unwrap();
+
+        let mut result = RemotePlotter {
+            runtime,
+            client,
             width,
             height,
-            x: RefCell::new(0),
-            y: RefCell::new(0),
-            commands: RefCell::new(Vec::new()),
+            x: 0,
+            y: 0,
+            commands: Vec::new(),
         };
         result.queue("EM,1,1");
         result.pen_up();
         result
     }
 
-    fn pen_up(&self) {
+    fn pen_up(&mut self) {
         self.queue("SP,1,500");
     }
 
-    fn pen_down(&self) {
+    fn pen_down(&mut self) {
         self.queue("SP,0,500");
     }
 
-    fn pen_move(&self, x: i32, y: i32) {
+    fn pen_move(&mut self, x: i32, y: i32) {
         let x = max(min(x, self.width), 0);
         let y = max(min(y, self.height), 0);
 
-        let dx = x - *self.x.borrow();
-        let dy = y - *self.y.borrow();
+        let dx = x - self.x;
+        let dy = y - self.y;
 
         if dx == 0 && dy == 0 {
             return;
@@ -55,34 +69,37 @@ impl RemotePlotter {
 
         self.queue(command.as_str());
 
-        *self.x.borrow_mut() += dx;
-        *self.y.borrow_mut() += dy;
+        self.x += dx;
+        self.y += dy;
     }
 
-    fn queue(&self, command: &str) {
-        self.commands
-            .borrow_mut()
-            .push(String::from_str(command).unwrap());
+    fn queue(&mut self, command: &str) {
+        self.commands.push(String::from_str(command).unwrap());
     }
 
-    fn flush(&self) {
-        let result = self
-            .client
-            .post(self.url.clone())
-            .body(self.commands.borrow_mut().join("\n"))
-            .send();
+    fn flush(&mut self) {
+        let request = Request::new(tokio_stream::iter(
+            self.commands
+                .iter()
+                .map(|command| Command {
+                    contents: command.clone(),
+                })
+                .collect::<Vec<Command>>(),
+        ));
+
+        let result = self.runtime.block_on(self.client.stream(request));
+
+        self.commands.clear();
 
         match result {
             Ok(_) => {}
             Err(err) => println!("{err}"),
         }
-
-        self.commands.borrow_mut().clear();
     }
 }
 
 impl Plotter for RemotePlotter {
-    fn plot(&self, lines: Vec<Vec<PlotPoint>>) {
+    fn plot(&mut self, lines: Vec<Vec<PlotPoint>>) {
         for line in &lines {
             let mut iter = line.iter();
             match iter.next() {

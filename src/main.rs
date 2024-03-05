@@ -95,22 +95,22 @@ fn main() {
     let hostname = cli.host.unwrap_or(String::from_str("localhost").unwrap());
     let port_number = cli.port.unwrap_or(7878);
 
-    let plotter = RemotePlotter::new(hostname, port_number, PLOTTER_WIDTH, PLOTTER_HEIGHT);
+    let mut plotter = RemotePlotter::new(hostname, port_number, PLOTTER_WIDTH, PLOTTER_HEIGHT);
 
     let page = Page::new();
 
-    plot_border(&page, &plotter);
+    plot_border(&page, &mut plotter);
     let seed: u64 = rand::random::<u64>();
 
     let mut gen = Pcg32::seed_from_u64(seed);
 
-    plot_grid_circles(&page, &mut gen, &plotter);
-    plot_cross_circles(&page, &mut gen, &plotter);
+    plot_grid_circles(&page, &mut gen, &mut plotter);
+    plot_cross_circles(&page, &mut gen, &mut plotter);
 
-    plot_signature(seed, &page, &plotter);
+    plot_signature(seed, &page, &mut plotter);
 }
 
-fn plot_border(page: &Page, plotter: &RemotePlotter) {
+fn plot_border(page: &Page, plotter: &mut RemotePlotter) {
     let page_rectangle = Rectangle::new(
         page.page_border,
         page.page_border + page.page_width,
@@ -121,7 +121,7 @@ fn plot_border(page: &Page, plotter: &RemotePlotter) {
     plotter.plot(page_rectangle.get_lines());
 }
 
-fn plot_grid_circles(page: &Page, gen: &mut rand_pcg::Lcg64Xsh32, plotter: &RemotePlotter) {
+fn plot_grid_circles(page: &Page, gen: &mut rand_pcg::Lcg64Xsh32, plotter: &mut RemotePlotter) {
     for i in 0..page.circles_x {
         for j in 0..page.circles_y {
             if gen.gen::<f32>() < GRID_CIRCLE_PROBABILITY {
@@ -137,7 +137,7 @@ fn plot_grid_circles(page: &Page, gen: &mut rand_pcg::Lcg64Xsh32, plotter: &Remo
     }
 }
 
-fn plot_cross_circles(page: &Page, gen: &mut rand_pcg::Lcg64Xsh32, plotter: &RemotePlotter) {
+fn plot_cross_circles(page: &Page, gen: &mut rand_pcg::Lcg64Xsh32, plotter: &mut RemotePlotter) {
     for i in 0..page.circles_x + 1 {
         for j in 0..page.circles_y + 1 {
             let range = if i == 0 && j == 0 {
@@ -173,7 +173,7 @@ fn plot_cross_circles(page: &Page, gen: &mut rand_pcg::Lcg64Xsh32, plotter: &Rem
     }
 }
 
-fn plot_signature(seed: u64, page: &Page, plotter: &RemotePlotter) {
+fn plot_signature(seed: u64, page: &Page, plotter: &mut RemotePlotter) {
     let font = HersheyFont::new("data/rowmans.jhf");
 
     let printed_max: u128 = u64::MAX as u128 + 1;
