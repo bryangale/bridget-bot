@@ -1,6 +1,6 @@
 # bridget-bot
 
-A plotter program to imitate Bridget Riley's 'Composition with Circles'. Uses [axidraw-over-http](https://github.com/bryangale/axidraw-over-http).
+A plotter program to imitate Bridget Riley's 'Composition with Circles'. Uses [axidraw-over-http](https://github.com/bryangale/axidraw-over-http) and [hershey-parser](https://github.com/bryangale/hershey-parser).
 
 ## Running
 - Install [Rust](https://www.rust-lang.org/tools/install)

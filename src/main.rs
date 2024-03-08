@@ -1,9 +1,10 @@
+use std::fs;
 use std::str::FromStr;
 
 use circle::create_circle;
 use circle::Range;
 use clap::Parser;
-use hershey_font::HersheyFont;
+use hershey_parser::HersheyFont;
 use plottable::Plottable;
 use plotter::Plotter;
 use rand::Rng;
@@ -15,7 +16,6 @@ use text::Text;
 
 mod circle;
 mod curve;
-mod hershey_font;
 mod plottable;
 mod plotter;
 mod rectangle;
@@ -174,7 +174,7 @@ fn plot_cross_circles(page: &Page, gen: &mut rand_pcg::Lcg64Xsh32, plotter: &mut
 }
 
 fn plot_signature(seed: u64, page: &Page, plotter: &mut RemotePlotter) {
-    let font = HersheyFont::new("data/rowmans.jhf");
+    let font = HersheyFont::new(&fs::read_to_string("data/rowmans.jhf").unwrap()).unwrap();
 
     let printed_max: u128 = u64::MAX as u128 + 1;
     let printed_seed: u128 = seed as u128 + 1;
