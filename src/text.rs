@@ -1,7 +1,5 @@
-use crate::{
-    hershey_font::HersheyFont,
-    plottable::{PlotPoint, Plottable},
-};
+use crate::plottable::{PlotPoint, Plottable};
+use hershey_parser::HersheyFont;
 
 pub struct Text<'a> {
     font: &'a HersheyFont,
@@ -32,12 +30,13 @@ impl<'a> Plottable for Text<'a> {
         let mut x: f32 = -self
             .font
             .get_glyph(self.string.chars().next().unwrap())
+            .unwrap()
             .left as f32
             * scale;
         let y = -(self.font.bottom + self.font.top) as f32 * 0.5 * scale;
 
         for character in self.string.chars() {
-            let glyph = self.font.get_glyph(character);
+            let glyph = self.font.get_glyph(character).unwrap();
 
             for stroke in &glyph.paths {
                 output.push(
